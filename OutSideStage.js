@@ -9,6 +9,9 @@
         constructor() {
             this.vm = Scratch.vm;
             this.runtime = this.vm.runtime;
+            this.originalSetXY = null;
+            this.targetPrototype = null;
+            this.enabled = false;
         }
 
         getInfo() {
@@ -39,14 +42,8 @@
                         blockType: Scratch.BlockType.COMMAND,
                         text: 'go to X [X] Y [Y] without fencing',
                         arguments: {
-                            X: {
-                                type: Scratch.ArgumentType.NUMBER,
-                                defaultValue: 0
-                            },
-                            Y: {
-                                type: Scratch.ArgumentType.NUMBER,
-                                defaultValue: 0
-                            }
+                            X: {type: Scratch.ArgumentType.NUMBER, defaultValue: 0},
+                            Y: {type: Scratch.ArgumentType.NUMBER, defaultValue: 0}
                         }
                     },
                     {
@@ -54,10 +51,7 @@
                         blockType: Scratch.BlockType.COMMAND,
                         text: 'set X to [X] without fencing',
                         arguments: {
-                            X: {
-                                type: Scratch.ArgumentType.NUMBER,
-                                defaultValue: 0
-                            }
+                            X: {type: Scratch.ArgumentType.NUMBER, defaultValue: 0}
                         }
                     },
                     {
@@ -65,10 +59,7 @@
                         blockType: Scratch.BlockType.COMMAND,
                         text: 'set Y to [Y] without fencing',
                         arguments: {
-                            Y: {
-                                type: Scratch.ArgumentType.NUMBER,
-                                defaultValue: 0
-                            }
+                            Y: {type: Scratch.ArgumentType.NUMBER, defaultValue: 0}
                         }
                     },
                     {
@@ -76,10 +67,7 @@
                         blockType: Scratch.BlockType.COMMAND,
                         text: 'change X by [X] without fencing',
                         arguments: {
-                            X: {
-                                type: Scratch.ArgumentType.NUMBER,
-                                defaultValue: 10
-                            }
+                            X: {type: Scratch.ArgumentType.NUMBER, defaultValue: 10}
                         }
                     },
                     {
@@ -87,31 +75,86 @@
                         blockType: Scratch.BlockType.COMMAND,
                         text: 'change Y by [Y] without fencing',
                         arguments: {
-                            Y: {
-                                type: Scratch.ArgumentType.NUMBER,
-                                defaultValue: 10
-                            }
+                            Y: {type: Scratch.ArgumentType.NUMBER, defaultValue: 10}
                         }
                     }
                 ]
             };
         }
 
+        getTargetPrototype() {
+            if (this.targetPrototype) return this.targetPrototype;
+
+            const target = this.runtime.targets.find(t =>
+                t && !t.isStage && typeof t.setXY === 'function'
+            );
+
+            if (!target) return null;
+
+            this.targetPrototype = Object.getPrototypeOf(target);
+            return this.targetPrototype;
+        }
+
         disableFencing() {
-            if (this.runtime.runtimeOptions.fencing === false) return;
-            this.vm.setRuntimeOptions({fencing: false});
+            if (this.enabled) return;
+
+            const prototype = this.getTargetPrototype();
+            if (!prototype || typeof prototype.setXY !== 'function') return;
+
+            if (!this.originalSetXY) {
+                this.originalSetXY = prototype.setXY;
+            }
+
+            const extension = this;
+
+            prototype.setXY = function (x, y, force) {
+                if (this.isStage || (this.dragging && !force)) return;
+
+                const oldX = this.x;
+                const oldY = this.y;
+
+                if (this.renderer) {
+                    this.x = x;
+                    this.y = y;
+                    this.renderer.updateDrawablePosition(this.drawableID, [x, y]);
+
+                    if (this.visible) {
+                        this.emitVisualChange();
+                        this.runtime.requestRedraw();
+                    }
+                } else {
+                    this.x = x;
+                    this.y = y;
+                }
+
+                if (this.onTargetMoved) {
+                    this.onTargetMoved(this, oldX, oldY, force);
+                }
+
+                this.runtime.requestTargetsUpdate(this);
+            };
+
+            this.enabled = true;
         }
 
         enableFencing() {
-            if (this.runtime.runtimeOptions.fencing === true) return;
-            this.vm.setRuntimeOptions({fencing: true});
+            if (!this.enabled) return;
+
+            const prototype = this.targetPrototype;
+            if (prototype && this.originalSetXY) {
+                prototype.setXY = this.originalSetXY;
+            }
+
+            this.enabled = false;
         }
 
         fencingEnabled() {
-            return !!this.runtime.runtimeOptions.fencing;
+            return !this.enabled;
         }
 
         goToXY(args, util) {
+            this.disableFencing();
+
             const x = Scratch.Cast.toNumber(args.X);
             const y = Scratch.Cast.toNumber(args.Y);
 
@@ -121,6 +164,8 @@
         }
 
         setX(args, util) {
+            this.disableFencing();
+
             const x = Scratch.Cast.toNumber(args.X);
 
             if (util && util.target && typeof util.target.setXY === 'function') {
@@ -129,6 +174,8 @@
         }
 
         setY(args, util) {
+            this.disableFencing();
+
             const y = Scratch.Cast.toNumber(args.Y);
 
             if (util && util.target && typeof util.target.setXY === 'function') {
@@ -137,6 +184,8 @@
         }
 
         changeX(args, util) {
+            this.disableFencing();
+
             const amount = Scratch.Cast.toNumber(args.X);
 
             if (util && util.target && typeof util.target.setXY === 'function') {
@@ -145,6 +194,8 @@
         }
 
         changeY(args, util) {
+            this.disableFencing();
+
             const amount = Scratch.Cast.toNumber(args.Y);
 
             if (util && util.target && typeof util.target.setXY === 'function') {
