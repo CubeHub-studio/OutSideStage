@@ -98,15 +98,13 @@
         }
 
         disableFencing() {
-            this.vm.setRuntimeOptions({
-                fencing: false
-            });
+            if (this.runtime.runtimeOptions.fencing === false) return;
+            this.vm.setRuntimeOptions({fencing: false});
         }
 
         enableFencing() {
-            this.vm.setRuntimeOptions({
-                fencing: true
-            });
+            if (this.runtime.runtimeOptions.fencing === true) return;
+            this.vm.setRuntimeOptions({fencing: true});
         }
 
         fencingEnabled() {
@@ -114,8 +112,6 @@
         }
 
         goToXY(args, util) {
-            this.disableFencing();
-
             const x = Scratch.Cast.toNumber(args.X);
             const y = Scratch.Cast.toNumber(args.Y);
 
@@ -125,8 +121,6 @@
         }
 
         setX(args, util) {
-            this.disableFencing();
-
             const x = Scratch.Cast.toNumber(args.X);
 
             if (util && util.target && typeof util.target.setXY === 'function') {
@@ -135,8 +129,6 @@
         }
 
         setY(args, util) {
-            this.disableFencing();
-
             const y = Scratch.Cast.toNumber(args.Y);
 
             if (util && util.target && typeof util.target.setXY === 'function') {
@@ -145,8 +137,6 @@
         }
 
         changeX(args, util) {
-            this.disableFencing();
-
             const amount = Scratch.Cast.toNumber(args.X);
 
             if (util && util.target && typeof util.target.setXY === 'function') {
@@ -155,8 +145,6 @@
         }
 
         changeY(args, util) {
-            this.disableFencing();
-
             const amount = Scratch.Cast.toNumber(args.Y);
 
             if (util && util.target && typeof util.target.setXY === 'function') {
